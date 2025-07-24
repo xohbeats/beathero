@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hip-Hop Beat Hero</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: #fff;
+      font-family: 'Orbitron', sans-serif;
+      overflow: hidden;
+    }
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(to bottom, #000 30%, #222);
+      overflow: hidden;
+    }
+    .lane {
+      position: absolute;
+      bottom: 0;
+      width: 20%;
+      height: 100%;
+      border-left: 2px solid #444;
+      border-right: 2px solid #444;
+    }
+    .note {
+      position: absolute;
+      width: 80%;
+      height: 40px;
+      background: #0ff;
+      border-radius: 8px;
+      left: 10%;
+    }
+    .hitbox {
+      position: absolute;
+      bottom: 10px;
+      width: 80%;
+      height: 20px;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid #0ff;
+      left: 10%;
+    }
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="score">Score: 0</div>
+    <div class="lane" style="left: 0%">
+      <div class="hitbox" id="hitbox0"></div>
+    </div>
+    <div class="lane" style="left: 20%">
+      <div class="hitbox" id="hitbox1"></div>
+    </div>
+    <div class="lane" style="left: 40%">
+      <div class="hitbox" id="hitbox2"></div>
+    </div>
+    <div class="lane" style="left: 60%">
+      <div class="hitbox" id="hitbox3"></div>
+    </div>
+    <div class="lane" style="left: 80%">
+      <div class="hitbox" id="hitbox4"></div>
+    </div>
+  </div>
+
+  <audio id="beat" src="your-beat.mp3"></audio>
+  <script>
+    const lanes = [0, 1, 2, 3, 4];
+    const hitKeys = ['A', 'S', 'D', 'F', 'G'];
+    let score = 0;
+
+    function spawnNote(lane) {
+      const note = document.createElement('div');
+      note.classList.add('note');
+      note.style.left = '10%';
+      note.style.bottom = '100%';
+      const laneDiv = document.getElementsByClassName('lane')[lane];
+      laneDiv.appendChild(note);
+
+      let bottom = 100;
+      const interval = setInterval(() => {
+        bottom -= 1;
+        note.style.bottom = bottom + '%';
+        if (bottom <= 0) {
+          clearInterval(interval);
+          note.remove();
+        }
+      }, 20);
+      note.dataset.lane = lane;
+      note.dataset.interval = interval;
+    }
+
+    function checkHit(laneIndex) {
+      const laneDiv = document.getElementsByClassName('lane')[laneIndex];
+      const notes = laneDiv.getElementsByClassName('note');
+      if (notes.length > 0) {
+        const note = notes[0];
+        const bottom = parseFloat(note.style.bottom);
+        if (bottom <= 15 && bottom >= 0) {
+          score += 10;
+          document.getElementById('score').innerText = 'Score: ' + score;
+          clearInterval(note.dataset.interval);
+          note.remove();
+        }
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      const key = e.key.toUpperCase();
+      const index = hitKeys.indexOf(key);
+      if (index !== -1) {
+        checkHit(index);
+      }
+    });
+
+    // Game loop
+    setInterval(() => {
+      const lane = lanes[Math.floor(Math.random() * lanes.length)];
+      spawnNote(lane);
+    }, 1000);
+
+    // Play beat
+    document.body.addEventListener('click', () => {
+      const beat = document.getElementById('beat');
+      beat.play();
+    });
+  </script>
+</body>
+</html>
