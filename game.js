@@ -1,121 +1,141 @@
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const audio = new Audio('audio/beathero.mp3');
-let analyser, dataArray, source, audioCtx;
-let difficulty = 'easy';
+// js/game.js
 
-const notes = [];
+let audioCtx;
+let source;
+let analyser;
+let dataArray;
+let bufferLength;
+
+const noteSpeed = 3; // pixels per frame
+const lanes = ['A', 'S', 'D', 'F'];
+const laneKeys = ['a', 's', 'd', 'f'];
+let notes = [];
 let score = 0;
-let highScore = localStorage.getItem('beatHeroHighScore') || 0;
 let lives = 3;
-let playing = false;
+let gameRunning = false;
+let startTime;
+let highScore = localStorage.getItem("hiphopHeroHighScore") || 0;
 
-function startGame(selectedDifficulty) {
-  document.getElementById('startScreen').style.display = 'none';
-  difficulty = selectedDifficulty;
-  score = 0;
-  lives = 3;
-  notes.length = 0;
-  setupAudio();
-  playing = true;
-  audio.play();
-  animate();
-}
+const audio = new Audio("audio/beathero.mp3");
+audio.crossOrigin = "anonymous";
 
-function setupAudio() {
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  source = audioCtx.createMediaElementSource(audio);
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 256;
-  dataArray = new Uint8Array(analyser.frequencyBinCount);
-  source.connect(analyser);
-  analyser.connect(audioCtx.destination);
-}
+document.addEventListener("DOMContentLoaded", () => {
+  const gameArea = document.getElementById("game");
+  const scoreDisplay = document.getElementById("score");
+  const startScreen = document.getElementById("start-screen");
+  const startButton = document.getElementById("start-button");
 
-function spawnNote() {
-  const lane = Math.floor(Math.random() * 4);
-  notes.push({ y: 0, lane });
-}
+  // Create lanes and hitboxes
+  lanes.forEach((laneKey, i) => {
+    const lane = document.createElement("div");
+    lane.classList.add("lane");
+    lane.style.left = `${i * 25}%`;
 
-function drawLanes() {
-  for (let i = 0; i < 4; i++) {
-    ctx.fillStyle = '#333';
-    ctx.fillRect(i * 200, 0, 200, canvas.height);
-  }
-}
-
-function drawNotes() {
-  ctx.fillStyle = '#0ff';
-  notes.forEach(note => {
-    ctx.fillRect(note.lane * 200 + 80, note.y, 40, 20);
+    const hitbox = document.createElement("div");
+    hitbox.classList.add("hitbox");
+    lane.appendChild(hitbox);
+    gameArea.appendChild(lane);
   });
-}
 
-function drawScore() {
-  ctx.fillStyle = '#fff';
-  ctx.fillText(`Score: ${score}`, 20, 30);
-  ctx.fillText(`High Score: ${highScore}`, 20, 60);
-  ctx.fillText(`Lives: ${lives}`, 20, 90);
-}
+  startButton.addEventListener("click", () => {
+    startScreen.style.display = "none";
+    startGame();
+  });
 
-function updateNotes() {
-  notes.forEach(note => {
-    note.y += 5;
-    if (note.y > canvas.height) {
-      lives--;
-      notes.splice(notes.indexOf(note), 1);
+  document.addEventListener("keydown", (e) => {
+    const index = laneKeys.indexOf(e.key);
+    if (index !== -1) {
+      hitNote(index);
     }
   });
-}
 
-function checkBeat() {
-  analyser.getByteFrequencyData(dataArray);
-  const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-  if (average > (difficulty === 'easy' ? 180 : difficulty === 'medium' ? 150 : 120)) {
-    spawnNote();
+  function startGame() {
+    gameRunning = true;
+    score = 0;
+    lives = 3;
+    scoreDisplay.textContent = `Score: ${score} | High: ${highScore}`;
+    notes = [];
+
+    // Initialize audio
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    source = audioCtx.createMediaElementSource(audio);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    bufferLength = analyser.frequencyBinCount;
+    dataArray = new Uint8Array(bufferLength);
+
+    source.connect(analyser);
+    analyser.connect(audioCtx.destination);
+
+    audio.play();
+    startTime = performance.now();
+
+    requestAnimationFrame(gameLoop);
+    generateNotes();
   }
-}
 
-function animate() {
-  if (!playing) return;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawLanes();
-  updateNotes();
-  drawNotes();
-  drawScore();
-  checkBeat();
-  if (lives <= 0) {
-    endGame();
-    return;
+  function generateNotes() {
+    setInterval(() => {
+      analyser.getByteFrequencyData(dataArray);
+      const avg = dataArray.reduce((a, b) => a + b, 0) / bufferLength;
+
+      if (avg > 140) {
+        const lane = Math.floor(Math.random() * 4);
+        const note = document.createElement("div");
+        note.classList.add("note");
+        note.dataset.lane = lane;
+        note.style.left = `${lane * 25 + 10}%`;
+        note.style.top = `-40px`;
+        document.getElementById("game").appendChild(note);
+        notes.push(note);
+      }
+    }, 200);
   }
-  requestAnimationFrame(animate);
-}
 
-function endGame() {
-  playing = false;
-  if (score > highScore) {
-    highScore = score;
-    localStorage.setItem('beatHeroHighScore', highScore);
-  }
-  alert('Game Over! Your score: ' + score);
-  document.getElementById('startScreen').style.display = 'flex';
-}
+  function hitNote(lane) {
+    for (let i = 0; i < notes.length; i++) {
+      const note = notes[i];
+      const noteTop = parseFloat(note.style.top);
+      const noteLane = parseInt(note.dataset.lane);
 
-window.addEventListener('keydown', (e) => {
-  if (!playing) return;
-  let hit = false;
-  notes.forEach(note => {
-    if (
-      (e.key === 'a' && note.lane === 0 ||
-      e.key === 's' && note.lane === 1 ||
-      e.key === 'd' && note.lane === 2 ||
-      e.key === 'f' && note.lane === 3) &&
-      note.y > 500 && note.y < 580
-    ) {
-      score += 10;
-      notes.splice(notes.indexOf(note), 1);
-      hit = true;
+      if (noteLane === lane && noteTop > window.innerHeight - 100 && noteTop < window.innerHeight - 20) {
+        score++;
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem("hiphopHeroHighScore", highScore);
+        }
+        document.getElementById("score").textContent = `Score: ${score} | High: ${highScore}`;
+        note.remove();
+        notes.splice(i, 1);
+        return;
+      }
     }
-  });
-  if (!hit) lives--;
+  }
+
+  function gameLoop(timestamp) {
+    if (!gameRunning) return;
+
+    notes.forEach((note, index) => {
+      let top = parseFloat(note.style.top);
+      top += noteSpeed;
+      note.style.top = `${top}px`;
+
+      if (top > window.innerHeight) {
+        note.remove();
+        notes.splice(index, 1);
+        lives--;
+        if (lives <= 0) {
+          endGame();
+        }
+      }
+    });
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function endGame() {
+    gameRunning = false;
+    alert(`Game Over! Final Score: ${score}`);
+    window.location.reload();
+  }
 });
